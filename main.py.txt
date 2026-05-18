@@ -1,0 +1,80 @@
+import logging
+import os
+from telegram import Update
+from telegram.ext import Application, MessageHandler, filters, ContextTypes
+from openai import OpenAI
+
+# --- НАСТРОЙКИ (БУДУТ ВЗЯТЫ ИЗ ПЕРЕМЕННЫХ ОКРУЖЕНИЯ RENDER.COM) ---
+TELEGRAM_BOT_TOKEN = os.environ["TELEGRAM_BOT_TOKEN"]
+OPENAI_API_KEY = os.environ["OPENAI_API_KEY"]
+# -----------------------------------------------------------
+
+# Настройка логирования
+logging.basicConfig(level=logging.INFO)
+
+# Создаём клиент OpenAI
+client = OpenAI(api_key=OPENAI_API_KEY)
+
+# --- СИСТЕМНЫЙ ПРОМПТ (ИНСТРУКЦИЯ ДЛЯ ИИ) ---
+SYSTEM_PROMPT = """
+Ты — вежливый и эффективный помощник. Пользователь присылает тебе текст голосового сообщения. Твоя задача:
+1. Написать краткую СУТЬ сообщения (1 предложение).
+2. Выделить ТЕЗИСЫ (список важных деталей).
+3. Написать черновик ОТВЕТА от лица пользователя, дружелюбный и по делу.
+
+Используй строгий формат:
+
+СУТЬ: ...
+ТЕЗИСЫ:
+- ...
+ОТВЕТ: ...
+"""
+
+async def handle_voice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Обрабатывает голосовое сообщение: скачивает, отправляет в Whisper, затем в GPT."""
+    user = update.effective_user
+    logging.info(f"Получено голосовое от пользователя {user.full_name}")
+
+    # 1. Скачиваем голосовой файл
+    voice_file = await update.message.voice.get_file()
+    voice_data = await voice_file.download_as_bytearray()
+
+    # 2. Отправляем в Whisper для расшифровки
+    await update.message.reply_text("🎙 Расшифровываю сообщение...")
+    transcription = client.audio.transcriptions.create(
+        model="whisper-1",
+        file=("voice.ogg", voice_data, "audio/ogg"),
+        language="ru"
+    )
+    transcribed_text = transcription.text
+    logging.info(f"Текст расшифровки: {transcribed_text}")
+
+    # 3. Отправляем расшифровку в ChatGPT с системным промптом
+    await update.message.reply_text("🤖 Обрабатываю запрос...")
+    completion = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": transcribed_text},
+            {"role": "user", "content": "Пожалуйста, обработай это сообщение."}
+        ]
+    )
+
+    # 4. Получаем ответ и отправляем пользователю
+    response_text = completion.choices[0].message.content
+    await update.message.reply_text(response_text)
+    logging.info("Ответ успешно отправлен")
+
+def main() -> None:
+    """Точка входа в приложение. Запускает бота."""
+    application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+
+    # Регистрируем обработчик голосовых сообщений
+    application.add_handler(MessageHandler(filters.VOICE, handle_voice))
+
+    # Запускаем бота
+    logging.info("Бот запущен!")
+    application.run_polling(allowed_updates=Update.ALL_TYPES)
+
+if __name__ == "__main__":
+    main()
