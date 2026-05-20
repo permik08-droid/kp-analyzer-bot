@@ -1,4 +1,5 @@
 import re
+from procurement_risks import analyze_procurement_risks
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
@@ -315,8 +316,39 @@ def create_procurement_report(items: list, output_path: str):
         if ws_summary.cell(row=row_idx, column=1).value == best_supplier:
             for col_idx in range(1, 6):
                 ws_summary.cell(row=row_idx, column=col_idx).fill = green_fill
+    # Лист 5 — Риски закупки
+    ws_risks = wb.create_sheet("Риски закупки")
 
-    # Лист 5 — Заключение
+    ws_risks.append([
+        "Поставщик",
+        "Риск",
+        "Уровень",
+        "Поле",
+        "Значение",
+        "Комментарий"
+    ])
+
+    risks = analyze_procurement_risks(items)
+
+    for risk in risks:
+        ws_risks.append([
+            risk.get("supplier", "не указано"),
+            risk.get("risk", ""),
+            risk.get("level", ""),
+            risk.get("field", ""),
+            risk.get("value", ""),
+            risk.get("comment", "")
+        ])
+
+    style_sheet(ws_risks, {
+        "A": 30,
+        "B": 35,
+        "C": 15,
+        "D": 25,
+        "E": 35,
+        "F": 80
+    })
+    # Лист 6 — Заключение
     ws_conclusion = wb.create_sheet("Заключение")
 
     total_positions = len(position_data)
@@ -326,6 +358,7 @@ def create_procurement_report(items: list, output_path: str):
     ws_conclusion.append(["Всего уникальных позиций", total_positions])
     ws_conclusion.append(["Лидер по минимальным ценам", best_supplier or "не определён"])
     ws_conclusion.append(["Потенциальная экономия", total_saving])
+    ws_conclusion.append(["Выявлено рисков закупки", len(risks)])
 
     ws_conclusion.append(["", ""])
     ws_conclusion.append(["Рекомендация", ""])
