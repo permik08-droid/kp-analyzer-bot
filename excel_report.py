@@ -5,7 +5,7 @@ from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
 
 
 def get_position_key(name: str) -> str:
-    name = str(name).upper()
+    text = str(name).upper()
 
     patterns = [
         r"СКВ\d[-\w]+",
@@ -15,11 +15,36 @@ def get_position_key(name: str) -> str:
     ]
 
     for pattern in patterns:
-        match = re.search(pattern, name)
+        match = re.search(pattern, text)
         if match:
             return match.group(0)
 
-    return name.strip()
+    text = text.replace("×", "X")
+    text = text.replace("Х", "X")
+
+    text = re.sub(r"[.,;:(){}\[\]\"']", " ", text)
+    text = re.sub(r"\s+", " ", text)
+
+    noise_words = [
+        "КУПИТЬ",
+        "ПОСТАВКА",
+        "ТОВАР",
+        "ИЗДЕЛИЕ",
+        "МАТЕРИАЛ",
+        "КОМПЛЕКТ",
+        "ШТ",
+        "ШТ.",
+        "ЕД",
+        "ЕД.",
+        "РУБ",
+        "ТГ",
+        "ТЕНГЕ"
+    ]
+
+    words = text.split()
+    words = [word for word in words if word not in noise_words]
+
+    return " ".join(words).strip()
 
 
 def clean_price(price):
