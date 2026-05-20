@@ -75,6 +75,11 @@ def create_procurement_report(items: list, output_path: str):
         "НДС",
         "Доставка",
         "Срок поставки",
+        "Условия оплаты",
+        "Гарантия",
+        "Срок действия КП",
+        "Производитель",
+        "Страна",
         "Комментарий"
     ])
 
@@ -86,6 +91,11 @@ def create_procurement_report(items: list, output_path: str):
             item.get("vat", "не указано"),
             item.get("delivery", "не указано"),
             item.get("delivery_time", "не указано"),
+            item.get("payment_terms", "не указано"),
+            item.get("warranty", "не указано"),
+            item.get("valid_until", "не указано"),
+            item.get("manufacturer", "не указано"),
+            item.get("country", "не указано"),
             item.get("comment", "")
         ])
 
@@ -96,7 +106,12 @@ def create_procurement_report(items: list, output_path: str):
         "D": 15,
         "E": 35,
         "F": 25,
-        "G": 45
+        "G": 28,
+        "H": 18,
+        "I": 22,
+        "J": 25,
+        "K": 18,
+        "L": 45
     })
 
     # Лист 2 — Позиции КП
