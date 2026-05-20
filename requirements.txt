@@ -1,0 +1,6 @@
+aiogram
+pandas
+openpyxl
+openai
+python-dotenv
+pdfplumber
