@@ -9,6 +9,8 @@ from aiogram.types import Message, FSInputFile
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from openai import OpenAI
+from kp_extractor import extract_kp_structure
+from excel_report import create_procurement_report
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -112,18 +114,14 @@ async def compare_handler(message: Message):
 
         report_path = f"Сравнение_КП_{user_id}.xlsx"
 
-        rows = []
-        for i, item in enumerate(files, start=1):
-            rows.append({
-                "№ КП": i,
-                "Файл": item["file_name"],
-                "Краткий вывод ИИ": result
-            })
+        structured_items = []
 
-        df_report = pd.DataFrame(rows)
+        for item in files:
+            data = extract_kp_structure(item["text"][:12000])
+            data["file_name"] = item["file_name"]
+            structured_items.append(data)
 
-        with pd.ExcelWriter(report_path, engine="openpyxl") as writer:
-            df_report.to_excel(writer, index=False, sheet_name="Сравнение")
+        create_procurement_report(structured_items, report_path)
 
         await message.answer(
             f"<b>Сравнение КП:</b>\n\n{result}"
