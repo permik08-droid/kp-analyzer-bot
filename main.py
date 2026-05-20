@@ -13,6 +13,8 @@ from kp_extractor import extract_kp_structure
 from kp_items_extractor import extract_kp_items
 from excel_report import create_procurement_report
 from dotenv import load_dotenv
+import pytesseract
+from pdf2image import convert_from_path
 
 load_dotenv()
 
@@ -32,6 +34,35 @@ user_files = {}
 
 
 def extract_text_from_pdf(file_path):
+    text = ""
+
+    # Сначала пробуем обычное извлечение текста
+    with fitz.open(file_path) as doc:
+        for page in doc:
+            text += page.get_text() + "\n"
+
+    text = text.strip()
+
+    if len(text) > 100:
+        return text
+
+    # Если текста мало — считаем, что это скан, и запускаем OCR
+    ocr_text = ""
+
+    try:
+        pages = convert_from_path(file_path, dpi=200)
+
+        for page in pages:
+            page_text = pytesseract.image_to_string(
+                page,
+                lang="rus+eng"
+            )
+            ocr_text += page_text + "\n"
+
+        return ocr_text.strip()
+
+    except Exception as e:
+        return text
     text = ""
     with fitz.open(file_path) as doc:
         for page in doc:
