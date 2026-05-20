@@ -10,6 +10,7 @@ from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from openai import OpenAI
 from kp_extractor import extract_kp_structure
+from kp_items_extractor import extract_kp_items
 from excel_report import create_procurement_report
 from dotenv import load_dotenv
 
@@ -119,6 +120,7 @@ async def compare_handler(message: Message):
         for item in files:
             data = extract_kp_structure(item["text"][:12000])
             data["file_name"] = item["file_name"]
+            data["items"] = extract_kp_items(item["text"][:12000])
             structured_items.append(data)
 
         create_procurement_report(structured_items, report_path)
