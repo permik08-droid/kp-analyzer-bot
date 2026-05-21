@@ -322,7 +322,7 @@ def create_procurement_report(items: list, output_path: str):
                     "Аномально низкая цена. Проверьте комплектацию и условия поставки.",
                     "KP Bot"
                 )
-
+    risks = analyze_procurement_risks(items)
     # Лист 4 — Итоги по поставщикам
     ws_summary = wb.create_sheet("Итоги поставщиков")
 
@@ -331,6 +331,8 @@ def create_procurement_report(items: list, output_path: str):
         "Всего позиций в КП",
         "Позиций выиграно",
         "Сумма выигранных позиций",
+        "Рисков",
+        "Рейтинг",
         "Комментарий"
     ])
 
@@ -343,7 +345,17 @@ def create_procurement_report(items: list, output_path: str):
         if wins > best_wins:
             best_wins = wins
             best_supplier = supplier
+        supplier_risks = len([
+            risk for risk in risks
+            if risk.get("supplier") == supplier
+        ])
 
+        if supplier_risks <= 1:
+            rating = "A"
+        elif supplier_risks <= 3:
+            rating = "B"
+        else:
+            rating = "C"
         comment = "Лидер по количеству минимальных цен" if wins > 0 else "Нет выигранных позиций"
 
         ws_summary.append([
@@ -351,6 +363,8 @@ def create_procurement_report(items: list, output_path: str):
             stat.get("positions", 0),
             wins,
             stat.get("sum_wins", 0),
+            supplier_risks,
+            rating,
             comment
         ])
 
@@ -359,12 +373,14 @@ def create_procurement_report(items: list, output_path: str):
         "B": 20,
         "C": 20,
         "D": 25,
-        "E": 45
+        "E": 12,
+        "F": 12,
+        "G": 45
     })
 
     for row_idx in range(2, ws_summary.max_row + 1):
         if ws_summary.cell(row=row_idx, column=1).value == best_supplier:
-            for col_idx in range(1, 6):
+            for col_idx in range(1, 8):
                 ws_summary.cell(row=row_idx, column=col_idx).fill = green_fill
     # Лист 5 — Риски закупки
     ws_risks = wb.create_sheet("Риски закупки")
@@ -378,7 +394,7 @@ def create_procurement_report(items: list, output_path: str):
         "Комментарий"
     ])
 
-    risks = analyze_procurement_risks(items)
+
 
     for risk in risks:
         ws_risks.append([
