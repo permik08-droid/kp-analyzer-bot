@@ -2,6 +2,7 @@ import re
 from procurement_risks import analyze_procurement_risks
 from openpyxl import Workbook
 from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+from openpyxl.comments import Comment
 
 
 def get_position_key(name: str) -> str:
@@ -87,6 +88,11 @@ def create_procurement_report(items: list, output_path: str):
 
     green_fill = PatternFill("solid", fgColor="C6EFCE")
     yellow_fill = PatternFill("solid", fgColor="FFF2CC")
+    red_fill = PatternFill(
+    start_color="FFC7CE",
+    end_color="FFC7CE",
+    fill_type="solid"
+)
 
     supplier_stats = {}
 
@@ -296,7 +302,26 @@ def create_procurement_report(items: list, output_path: str):
 
         if prices:
             min_price, min_col = min(prices, key=lambda x: x[0])
-            ws_map.cell(row=row_idx, column=min_col).fill = green_fill
+
+            ws_map.cell(
+                row=row_idx,
+                column=min_col
+            ).fill = green_fill
+
+            avg_price = sum(p[0] for p in prices) / len(prices)
+
+            if min_price < avg_price * 0.7:
+                cell = ws_map.cell(
+                    row=row_idx,
+                    column=min_col
+                )
+
+                cell.fill = red_fill
+
+                cell.comment = Comment(
+                    "Аномально низкая цена. Проверьте комплектацию и условия поставки.",
+                    "KP Bot"
+                )
 
     # Лист 4 — Итоги по поставщикам
     ws_summary = wb.create_sheet("Итоги поставщиков")
