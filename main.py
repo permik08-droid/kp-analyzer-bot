@@ -12,6 +12,7 @@ from openai import OpenAI
 from kp_extractor import extract_kp_structure
 from kp_items_extractor import extract_kp_items
 from excel_report import create_procurement_report
+from history import add_history_record
 from dotenv import load_dotenv
 import pytesseract
 from pdf2image import convert_from_path
@@ -155,6 +156,7 @@ async def compare_handler(message: Message):
             structured_items.append(data)
 
         create_procurement_report(structured_items, report_path)
+        add_history_record(structured_items)
 
         await message.answer(
             f"<b>Сравнение КП:</b>\n\n{result}"
