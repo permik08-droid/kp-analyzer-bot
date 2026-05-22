@@ -12,7 +12,7 @@ from openai import OpenAI
 from kp_extractor import extract_kp_structure
 from kp_items_extractor import extract_kp_items
 from excel_report import create_procurement_report
-from history import add_history_record, load_history
+from history import add_history_record, load_history, get_history_analytics
 from dotenv import load_dotenv
 import pytesseract
 from pdf2image import convert_from_path
@@ -122,10 +122,11 @@ async def help_handler(message: Message):
         "• риски закупки\n"
         "• заключение\n\n"
         "<b>Команды:</b>\n"
-        "/compare — сравнить КП\n"
-        "/history — история анализов\n"
-        "/clear — очистить загруженные файлы\n"
-        "/help — помощь"
+"/compare — сравнить КП\n"
+"/history — история анализов\n"
+"/analytics — аналитика закупок\n"
+"/clear — очистить загруженные файлы\n"
+"/help — помощь"
     )
 @dp.message(Command("history"))
 async def history_handler(message: Message):
@@ -151,7 +152,31 @@ async def history_handler(message: Message):
         )
 
     await message.answer("\n".join(lines))
+@dp.message(Command("analytics"))
+async def analytics_handler(message: Message):
+    analytics = get_history_analytics()
 
+    if not analytics:
+        await message.answer("Аналитики пока нет. Сначала сделайте хотя бы один анализ КП.")
+        return
+
+    lines = [
+        "<b>Аналитика по закупкам:</b>",
+        "",
+        f"Всего анализов: {analytics['total']}",
+        f"Средняя экономия: {analytics['avg_saving']:,.0f} ₽".replace(",", " "),
+        f"Среднее количество рисков: {analytics['avg_risks']:.1f}",
+        "",
+        "<b>Рейтинг победителей:</b>"
+    ]
+
+    if analytics["winners_rating"]:
+        for index, (winner, count) in enumerate(analytics["winners_rating"], start=1):
+            lines.append(f"{index}. {winner} — побед: {count}")
+    else:
+        lines.append("Пока нет определённых победителей.")
+
+    await message.answer("\n".join(lines))
 @dp.message(Command("compare"))
 async def compare_handler(message: Message):
     user_id = message.from_user.id

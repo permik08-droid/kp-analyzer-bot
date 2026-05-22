@@ -84,3 +84,31 @@ def add_history_record(items):
     history = load_history()
     history.append(record)
     save_history(history)
+def get_history_analytics():
+    history = load_history()
+
+    if not history:
+        return None
+
+    total = len(history)
+    avg_saving = sum(record.get("saving", 0) for record in history) / total
+    avg_risks = sum(record.get("risks_count", 0) for record in history) / total
+
+    winners = {}
+    for record in history:
+        winner = record.get("winner", "не определён")
+        if winner and winner != "не определён":
+            winners[winner] = winners.get(winner, 0) + 1
+
+    winners_rating = sorted(
+        winners.items(),
+        key=lambda x: x[1],
+        reverse=True
+    )
+
+    return {
+        "total": total,
+        "avg_saving": avg_saving,
+        "avg_risks": avg_risks,
+        "winners_rating": winners_rating
+    }
