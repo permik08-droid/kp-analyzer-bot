@@ -5,7 +5,7 @@ import fitz
 
 from aiogram import Bot, Dispatcher
 from aiogram.filters import CommandStart, Command
-from aiogram.types import Message, FSInputFile
+from aiogram.types import Message, FSInputFile, ReplyKeyboardMarkup, KeyboardButton
 from aiogram.enums import ParseMode
 from aiogram.client.default import DefaultBotProperties
 from openai import OpenAI
@@ -32,6 +32,16 @@ bot = Bot(
 dp = Dispatcher()
 
 user_files = {}
+main_keyboard = ReplyKeyboardMarkup(
+    keyboard=[
+        [KeyboardButton(text="/compare")],
+        [KeyboardButton(text="/history")],
+        [KeyboardButton(text="/clear")]
+    ],
+    resize_keyboard=True,
+    one_time_keyboard=False,
+    input_field_placeholder="Выберите действие"
+)
 
 
 def extract_text_from_pdf(file_path):
@@ -87,7 +97,8 @@ async def start_handler(message: Message):
         "Команды:\n"
         "/compare — сравнить загруженные КП\n"
         "/history — история анализов\n"
-        "/clear — очистить загруженные файлы"
+        "/clear — очистить загруженные файлы",
+        reply_markup=main_keyboard
     )
 
 
