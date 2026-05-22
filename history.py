@@ -78,7 +78,8 @@ def add_history_record(items):
         "kp_count": len(items),
         "winner": winner,
         "saving": saving,
-        "risks_count": len(risks)
+        "risks_count": len(risks),
+        "suppliers": amounts
     }
 
     history = load_history()
@@ -112,3 +113,52 @@ def get_history_analytics():
         "avg_risks": avg_risks,
         "winners_rating": winners_rating
     }
+def get_supplier_statistics():
+    history = load_history()
+
+    stats = {}
+
+    for record in history:
+        winner = record.get("winner")
+
+        for supplier_data in record.get("suppliers", []):
+            supplier = supplier_data.get("supplier")
+
+            if not supplier:
+                continue
+
+            if supplier not in stats:
+                stats[supplier] = {
+                    "participations": 0,
+                    "wins": 0
+                }
+
+            stats[supplier]["participations"] += 1
+
+            if supplier == winner:
+                stats[supplier]["wins"] += 1
+
+    result = []
+
+    for supplier, data in stats.items():
+        participations = data["participations"]
+        wins = data["wins"]
+
+        win_rate = 0
+
+        if participations:
+            win_rate = round(wins * 100 / participations, 1)
+
+        result.append({
+            "supplier": supplier,
+            "participations": participations,
+            "wins": wins,
+            "win_rate": win_rate
+        })
+
+    result.sort(
+        key=lambda x: x["wins"],
+        reverse=True
+    )
+
+    return result

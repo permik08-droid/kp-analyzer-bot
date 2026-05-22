@@ -12,7 +12,7 @@ from openai import OpenAI
 from kp_extractor import extract_kp_structure
 from kp_items_extractor import extract_kp_items
 from excel_report import create_procurement_report
-from history import add_history_record, load_history, get_history_analytics
+from history import add_history_record, load_history, get_history_analytics, get_supplier_statistics
 from dotenv import load_dotenv
 import pytesseract
 from pdf2image import convert_from_path
@@ -149,6 +149,25 @@ async def history_handler(message: Message):
                 f"Экономия: {record.get('saving', 0):,.0f} ₽\n".replace(",", " ")
                 + f"Рисков: {record.get('risks_count', 0)}"
             )
+        )
+
+    await message.answer("\n".join(lines))
+@dp.message(Command("suppliers"))
+async def suppliers_handler(message: Message):
+    suppliers = get_supplier_statistics()
+
+    if not suppliers:
+        await message.answer("Статистика поставщиков пока отсутствует.")
+        return
+
+    lines = ["<b>Статистика поставщиков:</b>", ""]
+
+    for index, supplier in enumerate(suppliers[:10], start=1):
+        lines.append(
+            f"{index}. {supplier['supplier']}\n"
+            f"Участий: {supplier['participations']}\n"
+            f"Побед: {supplier['wins']}\n"
+            f"Процент побед: {supplier['win_rate']}%\n"
         )
 
     await message.answer("\n".join(lines))
