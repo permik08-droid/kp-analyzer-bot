@@ -36,6 +36,8 @@ main_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="/compare")],
         [KeyboardButton(text="/history")],
+        [KeyboardButton(text="/analytics")],
+        [KeyboardButton(text="/suppliers")],
         [KeyboardButton(text="/clear")],
         [KeyboardButton(text="/help")]
     ],

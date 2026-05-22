@@ -213,7 +213,12 @@ def create_procurement_report(items: list, output_path: str):
 
         for position in item.get("items", []):
             name = position.get("name", "не указано")
-            key = get_position_key(name)
+            key_source = (
+                position.get("match_key")
+                or position.get("normalized_name")
+                or name
+            )
+            key = get_position_key(key_source)
             price = position.get("price", "не указано")
 
             if key not in position_data:
