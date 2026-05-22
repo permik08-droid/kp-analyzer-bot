@@ -414,7 +414,61 @@ def create_procurement_report(items: list, output_path: str):
         "E": 35,
         "F": 80
     })
-    # Лист 6 — Заключение
+        # Лист 6 — Проверка поставщиков
+    ws_supplier_check = wb.create_sheet("Проверка поставщиков")
+
+    ws_supplier_check.append([
+        "Поставщик",
+        "Производитель",
+        "Страна",
+        "НДС",
+        "Гарантия",
+        "Предоплата",
+        "Рисков",
+        "Оценка"
+    ])
+
+    for item in items:
+        supplier = item.get("supplier", "не указано")
+        supplier_risks = [
+            risk for risk in risks
+            if risk.get("supplier") == supplier
+        ]
+
+        payment_terms = str(item.get("payment_terms", "")).lower()
+        prepayment = "Да" if "100" in payment_terms or "полная предоплата" in payment_terms else "Нет"
+
+        risks_count = len(supplier_risks)
+
+        if risks_count <= 1:
+            supplier_score = "Надёжный"
+        elif risks_count <= 3:
+            supplier_score = "Требует проверки"
+        else:
+            supplier_score = "Высокий риск"
+
+        ws_supplier_check.append([
+            supplier,
+            item.get("manufacturer", "не указано"),
+            item.get("country", "не указано"),
+            item.get("vat", "не указано"),
+            item.get("warranty", "не указано"),
+            prepayment,
+            risks_count,
+            supplier_score
+        ])
+
+    style_sheet(ws_supplier_check, {
+        "A": 35,
+        "B": 30,
+        "C": 18,
+        "D": 18,
+        "E": 20,
+        "F": 15,
+        "G": 12,
+        "H": 25
+    })
+    # Лист 7 — Заключение
     ws_conclusion = wb.create_sheet("Заключение")
 
     total_positions = len(position_data)
