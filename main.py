@@ -36,7 +36,8 @@ main_keyboard = ReplyKeyboardMarkup(
     keyboard=[
         [KeyboardButton(text="/compare")],
         [KeyboardButton(text="/history")],
-        [KeyboardButton(text="/clear")]
+        [KeyboardButton(text="/clear")],
+        [KeyboardButton(text="/help")]
     ],
     resize_keyboard=True,
     one_time_keyboard=False,
@@ -106,6 +107,26 @@ async def start_handler(message: Message):
 async def clear_handler(message: Message):
     user_files[message.from_user.id] = []
     await message.answer("Загруженные файлы очищены. Можно отправлять новые КП.")
+@dp.message(Command("help"))
+async def help_handler(message: Message):
+    await message.answer(
+        "<b>Как пользоваться ботом</b>\n\n"
+        "1. Отправьте от 2 до 5 КП в формате PDF или Excel.\n"
+        "2. Нажмите /compare.\n"
+        "3. Бот сформирует анализ и Excel-отчёт.\n\n"
+        "<b>Что есть в отчёте:</b>\n"
+        "• сравнение КП\n"
+        "• позиции КП\n"
+        "• конкурентная карта\n"
+        "• итоги поставщиков\n"
+        "• риски закупки\n"
+        "• заключение\n\n"
+        "<b>Команды:</b>\n"
+        "/compare — сравнить КП\n"
+        "/history — история анализов\n"
+        "/clear — очистить загруженные файлы\n"
+        "/help — помощь"
+    )
 @dp.message(Command("history"))
 async def history_handler(message: Message):
     history = load_history()
