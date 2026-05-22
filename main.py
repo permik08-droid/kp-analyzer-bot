@@ -12,7 +12,7 @@ from openai import OpenAI
 from kp_extractor import extract_kp_structure
 from kp_items_extractor import extract_kp_items
 from excel_report import create_procurement_report
-from history import add_history_record
+from history import add_history_record, load_history
 from dotenv import load_dotenv
 import pytesseract
 from pdf2image import convert_from_path
@@ -86,6 +86,7 @@ async def start_handler(message: Message):
         "Когда загрузишь все файлы, напиши /compare.\n\n"
         "Команды:\n"
         "/compare — сравнить загруженные КП\n"
+        "/history — история анализов\n"
         "/clear — очистить загруженные файлы"
     )
 
@@ -94,7 +95,30 @@ async def start_handler(message: Message):
 async def clear_handler(message: Message):
     user_files[message.from_user.id] = []
     await message.answer("Загруженные файлы очищены. Можно отправлять новые КП.")
+@dp.message(Command("history"))
+async def history_handler(message: Message):
+    history = load_history()
 
+    if not history:
+        await message.answer("История анализов пока пустая.")
+        return
+
+    last_records = history[-10:]
+    lines = ["<b>Последние анализы:</b>"]
+
+    for record in reversed(last_records):
+        lines.append(
+            (
+                "\n"
+                f"Дата: {record.get('date', 'не указано')}\n"
+                f"КП: {record.get('kp_count', 0)}\n"
+                f"Победитель: {record.get('winner', 'не определён')}\n"
+                f"Экономия: {record.get('saving', 0):,.0f} ₽\n".replace(",", " ")
+                + f"Рисков: {record.get('risks_count', 0)}"
+            )
+        )
+
+    await message.answer("\n".join(lines))
 
 @dp.message(Command("compare"))
 async def compare_handler(message: Message):
