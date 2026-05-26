@@ -52,6 +52,35 @@ def get_position_key(name: str) -> str:
 
     return " ".join(words).strip()
 
+def normalize_unit(unit):
+    value = str(unit).strip().lower()
+    value = value.replace(".", "")
+
+    unit_map = {
+        "шт": "шт",
+        "штука": "шт",
+        "штук": "шт",
+        "ед": "шт",
+        "единица": "шт",
+        "единиц": "шт",
+        "комплект": "компл",
+        "комплекта": "компл",
+        "компл": "компл",
+        "м": "м",
+        "метр": "м",
+        "метра": "м",
+        "пм": "м",
+        "пог м": "м",
+        "кг": "кг",
+        "килограмм": "кг",
+        "тонна": "т",
+        "т": "т",
+        "л": "л",
+        "литр": "л"
+    }
+
+    return unit_map.get(value, value)
+
 
 def clean_price(price):
     try:
@@ -352,7 +381,7 @@ def create_procurement_report(items: list, output_path: str):
         "Сумма"
     ])
 
-
+    matching_groups = {}
     for item in items:
         supplier = item.get("supplier", "не указано")
 
@@ -364,7 +393,19 @@ def create_procurement_report(items: list, output_path: str):
                 or name
             )
             key = get_position_key(key_source)
+            if key not in matching_groups:
+                matching_groups[key] = []
 
+            matching_groups[key].append({
+                "supplier": supplier,
+                "name": name,
+                "unit": position.get("unit", "не указано"),
+                "quantity": position.get("quantity", "не указано"),
+                "price": position.get("price", "не указано"),
+                "amount": position.get("amount", "не указано"),
+                "match_key": position.get("match_key", ""),
+                "normalized_name": position.get("normalized_name", "")
+            })
             ws_matching.append([
                 key,
                 supplier,
@@ -387,6 +428,49 @@ def create_procurement_report(items: list, output_path: str):
         "G": 12,
         "H": 18,
         "I": 18
+    })
+    # Лист 5 — Контроль сопоставления
+    ws_match_control = wb.create_sheet("Контроль сопоставления")
+
+    ws_match_control.append([
+        "Ключ позиции",
+        "Проблема",
+        "Уровень",
+        "Детали"
+    ])
+
+    for key, group in matching_groups.items():
+        units = sorted(set(
+            normalize_unit(position.get("unit", "не указано"))
+            for position in group
+            if str(position.get("unit", "не указано")).strip()
+        ))
+
+        if len(units) > 1:
+            ws_match_control.append([
+                key,
+                "Разные единицы измерения",
+                "Предупреждение",
+                ", ".join(units)
+            ])
+        quantities = sorted(set(
+            str(position.get("quantity", "не указано")).strip()
+            for position in group
+            if str(position.get("quantity", "не указано")).strip()
+        ))
+
+        if len(quantities) > 1:
+            ws_match_control.append([
+                key,
+                "Разные количества",
+                "Критично",
+                ", ".join(quantities)
+            ])
+    style_sheet(ws_match_control, {
+        "A": 30,
+        "B": 35,
+        "C": 18,
+        "D": 80
     })
     risks = analyze_procurement_risks(items)
     # Лист 4 — Итоги по поставщикам
