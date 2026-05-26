@@ -466,6 +466,24 @@ def create_procurement_report(items: list, output_path: str):
                 "Критично",
                 ", ".join(quantities)
             ])
+        prices = []
+
+        for position in group:
+            numeric_price = clean_price(position.get("price", "не указано"))
+            if numeric_price is not None:
+                prices.append(numeric_price)
+
+        if len(prices) > 1:
+            min_price = min(prices)
+            max_price = max(prices)
+
+            if min_price > 0 and max_price / min_price > 3:
+                ws_match_control.append([
+                    key,
+                    "Большой разброс цен",
+                    "Предупреждение",
+                    f"{min_price} → {max_price}"
+                ])
     style_sheet(ws_match_control, {
         "A": 30,
         "B": 35,
