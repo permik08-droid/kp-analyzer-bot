@@ -488,9 +488,10 @@ def create_procurement_report(items: list, output_path: str):
         ))
 
         quantities = sorted(set(
-            str(position.get("quantity", "не указано")).strip()
+            str(position.get("quantity", "")).strip()
             for position in group
-            if str(position.get("quantity", "не указано")).strip()
+            if str(position.get("quantity", "")).strip()
+            and str(position.get("quantity", "")).strip().lower() != "не указано"
         ))
 
         if len(quantities) > 1:
