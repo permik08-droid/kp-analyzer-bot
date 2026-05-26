@@ -45,6 +45,9 @@ def analyze_procurement_risks(items):
         delivery_time = item.get("delivery_time")
         vat = normalize(item.get("vat"))
         manufacturer = item.get("manufacturer")
+        country = item.get("country")
+        valid_until = item.get("valid_until")
+        total_amount = item.get("total_amount")
 
         if "100" in payment_terms or "полная предоплата" in payment_terms:
             risks.append({
@@ -65,6 +68,15 @@ def analyze_procurement_risks(items):
                 "value": item.get("warranty", "не указано"),
                 "comment": "В КП не указана гарантия. Нужно запросить срок гарантии письменно."
             })
+        if is_empty(payment_terms):
+            risks.append({
+                "supplier": supplier,
+                "risk": "Условия оплаты не указаны",
+                "level": "Средний",
+                "field": "Условия оплаты",
+                "value": item.get("payment_terms", "не указано"),
+                "comment": "В КП отсутствуют условия оплаты. Необходимо запросить порядок и сроки оплаты."
+            })
 
         if (
             "отдельно" in delivery
@@ -79,6 +91,15 @@ def analyze_procurement_risks(items):
                 "field": "Доставка",
                 "value": item.get("delivery", "не указано"),
                 "comment": "Доставка может увеличить итоговую стоимость закупки."
+            })
+        if is_empty(delivery_time):
+            risks.append({
+                "supplier": supplier,
+                "risk": "Срок поставки не указан",
+                "level": "Средний",
+                "field": "Срок поставки",
+                "value": item.get("delivery_time", "не указано"),
+                "comment": "В КП отсутствует срок поставки. Необходимо запросить сроки поставки письменно."
             })
 
         days = extract_days(delivery_time)
@@ -110,6 +131,35 @@ def analyze_procurement_risks(items):
                 "field": "Производитель",
                 "value": item.get("manufacturer", "не указано"),
                 "comment": "Нужно запросить производителя или бренд товара."
+            })
+        if is_empty(country):
+            risks.append({
+                "supplier": supplier,
+                "risk": "Страна происхождения не указана",
+                "level": "Низкий",
+                "field": "Страна",
+                "value": item.get("country", "не указано"),
+                "comment": "В КП не указана страна происхождения товара. При необходимости запросить у поставщика."
+            })
+
+        if is_empty(valid_until):
+            risks.append({
+                "supplier": supplier,
+                "risk": "Срок действия КП не указан",
+                "level": "Низкий",
+                "field": "Срок действия КП",
+                "value": item.get("valid_until", "не указано"),
+                "comment": "В КП не указан срок действия предложения. Нужно уточнить, до какой даты действуют цены."
+            })
+
+        if is_empty(total_amount):
+            risks.append({
+                "supplier": supplier,
+                "risk": "Сумма КП не определена",
+                "level": "Средний",
+                "field": "Сумма",
+                "value": item.get("total_amount", "не указано"),
+                "comment": "Не удалось определить общую сумму КП. Нужно проверить файл вручную."
             })
 
     return risks
