@@ -490,11 +490,13 @@ def create_procurement_report(items: list, output_path: str):
             max_price, max_supplier = max(price_details, key=lambda x: x[0])
 
             if min_price > 0 and max_price / min_price > 3:
+                ratio = round(max_price / min_price, 1)
+
                 ws_match_control.append([
                     key,
                     "Большой разброс цен",
                     "Предупреждение",
-                    f"{min_supplier}: {min_price} | {max_supplier}: {max_price}"
+                    f"{min_supplier}: {min_price} | {max_supplier}: {max_price} | x{ratio}"
                 ])
         names = sorted(set(
             str(position.get("name", "не указано")).strip()
