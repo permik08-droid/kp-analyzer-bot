@@ -52,6 +52,34 @@ def get_position_key(name: str) -> str:
 
     return " ".join(words).strip()
 
+
+def extract_article(name):
+    text = str(name).upper()
+    text = text.replace("×", "X")
+    text = text.replace("Х", "X")
+    text = text.replace("-", " ")
+    text = re.sub(r"[.,;:(){}\[\]\"']", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+
+    patterns = [
+        r"BT\d+\s+СКВ\d+\s+\d+",
+        r"BT\d+\s+CKB\d+\s+\d+",
+        r"СКВ\d+\s+TWN\d+\s+\d+",
+        r"CKB\d+\s+TWN\d+\s+\d+",
+        r"RDH\s+D\d+\s+\d+\s+\d+L",
+        r"PS\s+BT\d+\s+\d+\s+HO",
+        r"M\d+\s*X\s*\d+",
+        r"\d+\s*X\s*\d+"
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(0).strip()
+
+    return ""
+
+
 def normalize_unit(unit):
     value = str(unit).strip().lower()
     value = value.replace(".", "")
@@ -510,6 +538,19 @@ def create_procurement_report(items: list, output_path: str):
                 "Много разных наименований в одной группе",
                 "Предупреждение",
                 " | ".join(names[:5])
+            ])
+        articles = sorted(set(
+            extract_article(position.get("name", ""))
+            for position in group
+            if extract_article(position.get("name", ""))
+        ))
+
+        if len(articles) > 1:
+            ws_match_control.append([
+                key,
+                "Разные артикулы в одной группе",
+                "Критично",
+                " | ".join(articles[:5])
             ])
     style_sheet(ws_match_control, {
         "A": 30,
