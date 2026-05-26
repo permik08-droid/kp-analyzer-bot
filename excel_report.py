@@ -349,26 +349,10 @@ def create_procurement_report(items: list, output_path: str):
         "Ед. изм.",
         "Кол-во",
         "Цена",
-        "Сумма",
-        "Комментарий проверки"
+        "Сумма"
     ])
 
-    matching_names_by_key = {}
 
-    for item in items:
-        for position in item.get("items", []):
-            name = position.get("name", "не указано")
-            key_source = (
-                position.get("match_key")
-                or position.get("normalized_name")
-                or name
-            )
-            key = get_position_key(key_source)
-
-            if key not in matching_names_by_key:
-                matching_names_by_key[key] = set()
-
-            matching_names_by_key[key].add(name)
     for item in items:
         supplier = item.get("supplier", "не указано")
 
@@ -390,10 +374,7 @@ def create_procurement_report(items: list, output_path: str):
                 position.get("unit", "не указано"),
                 position.get("quantity", "не указано"),
                 position.get("price", "не указано"),
-                position.get("amount", "не указано"),
-                  "Проверить: разные наименования в одной группе"
-                  if len(matching_names_by_key.get(key, set())) > 1
-                  else ""
+                position.get("amount", "не указано")
             ])
 
     style_sheet(ws_matching, {
@@ -405,8 +386,7 @@ def create_procurement_report(items: list, output_path: str):
         "F": 12,
         "G": 12,
         "H": 18,
-        "I": 18,
-        "J": 35
+        "I": 18
     })
     risks = analyze_procurement_risks(items)
     # Лист 4 — Итоги по поставщикам
