@@ -515,6 +515,16 @@ def create_procurement_report(items: list, output_path: str):
         "C": 18,
         "D": 80
     })
+    for row in ws_match_control.iter_rows(min_row=2):
+        level = row[2].value
+
+        if level == "Критично":
+            for cell in row:
+                cell.fill = red_fill
+
+        elif level == "Предупреждение":
+            for cell in row:
+                cell.fill = yellow_fill
     risks = analyze_procurement_risks(items)
     # Лист 4 — Итоги по поставщикам
     ws_summary = wb.create_sheet("Итоги поставщиков")
