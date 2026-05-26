@@ -8,23 +8,28 @@ from openpyxl.comments import Comment
 def get_position_key(name: str) -> str:
     text = str(name).upper()
 
+    text = text.replace("×", "X")
+    text = text.replace("Х", "X")
+    text = text.replace("-", " ")
+    text = text.replace("CKB", "СКВ")
+    text = text.replace("CK", "СК")
+    text = re.sub(r"[.,;:(){}\[\]\"']", " ", text)
+    text = re.sub(r"\s+", " ", text).strip()
+
     patterns = [
-        r"СКВ\d[-\w]+",
-        r"BT\d+[-\w]+",
-        r"RDH[-\w]+",
-        r"[A-ZА-Я]{2,}\d+[-\w]+"
+        r"BT\d+\s+СКВ\d+\s+\d+",
+        r"BT\d+\s+CKB\d+\s+\d+",
+        r"СКВ\d+\s+TWN\d+\s+\d+",
+        r"CKB\d+\s+TWN\d+\s+\d+",
+        r"RDH\s+D\d+\s+\d+\s+\d+L",
+        r"PS\s+BT\d+\s+\d+\s+HO",
+        r"[A-ZА-Я]{2,}\d+\s+\d+"
     ]
 
     for pattern in patterns:
         match = re.search(pattern, text)
         if match:
-            return match.group(0)
-
-    text = text.replace("×", "X")
-    text = text.replace("Х", "X")
-
-    text = re.sub(r"[.,;:(){}\[\]\"']", " ", text)
-    text = re.sub(r"\s+", " ", text)
+            return match.group(0).strip()
 
     noise_words = [
         "КУПИТЬ",
@@ -173,7 +178,12 @@ def create_procurement_report(items: list, output_path: str):
 
         for position in item.get("items", []):
             name = position.get("name", "не указано")
-            key = get_position_key(name)
+            key_source = (
+                position.get("match_key")
+                or position.get("normalized_name")
+                or name
+            )
+            key = get_position_key(key_source)
 
             supplier_stats[supplier]["positions"] += 1
 
@@ -327,6 +337,77 @@ def create_procurement_report(items: list, output_path: str):
                     "Аномально низкая цена. Проверьте комплектацию и условия поставки.",
                     "KP Bot"
                 )
+    # Лист 4 — Сопоставление позиций
+    ws_matching = wb.create_sheet("Сопоставление позиций")
+
+    ws_matching.append([
+        "Ключ позиции",
+        "Поставщик",
+        "Исходное наименование",
+        "match_key GPT",
+        "normalized_name",
+        "Ед. изм.",
+        "Кол-во",
+        "Цена",
+        "Сумма",
+        "Комментарий проверки"
+    ])
+
+    matching_names_by_key = {}
+
+    for item in items:
+        for position in item.get("items", []):
+            name = position.get("name", "не указано")
+            key_source = (
+                position.get("match_key")
+                or position.get("normalized_name")
+                or name
+            )
+            key = get_position_key(key_source)
+
+            if key not in matching_names_by_key:
+                matching_names_by_key[key] = set()
+
+            matching_names_by_key[key].add(name)
+    for item in items:
+        supplier = item.get("supplier", "не указано")
+
+        for position in item.get("items", []):
+            name = position.get("name", "не указано")
+            key_source = (
+                position.get("match_key")
+                or position.get("normalized_name")
+                or name
+            )
+            key = get_position_key(key_source)
+
+            ws_matching.append([
+                key,
+                supplier,
+                name,
+                position.get("match_key", ""),
+                position.get("normalized_name", ""),
+                position.get("unit", "не указано"),
+                position.get("quantity", "не указано"),
+                position.get("price", "не указано"),
+                position.get("amount", "не указано"),
+                  "Проверить: разные наименования в одной группе"
+                  if len(matching_names_by_key.get(key, set())) > 1
+                  else ""
+            ])
+
+    style_sheet(ws_matching, {
+        "A": 25,
+        "B": 30,
+        "C": 60,
+        "D": 35,
+        "E": 35,
+        "F": 12,
+        "G": 12,
+        "H": 18,
+        "I": 18,
+        "J": 35
+    })
     risks = analyze_procurement_risks(items)
     # Лист 4 — Итоги по поставщикам
     ws_summary = wb.create_sheet("Итоги поставщиков")
