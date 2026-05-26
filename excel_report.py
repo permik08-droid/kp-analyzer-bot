@@ -453,6 +453,12 @@ def create_procurement_report(items: list, output_path: str):
                 "Предупреждение",
                 ", ".join(units)
             ])
+        quantity_details = sorted(set(
+            f"{position.get('supplier', 'не указано')}: {position.get('quantity', 'не указано')}"
+            for position in group
+            if str(position.get("quantity", "не указано")).strip()
+        ))
+
         quantities = sorted(set(
             str(position.get("quantity", "не указано")).strip()
             for position in group
@@ -464,26 +470,45 @@ def create_procurement_report(items: list, output_path: str):
                 key,
                 "Разные количества",
                 "Критично",
-                ", ".join(quantities)
+                " | ".join(quantity_details)
             ])
-        prices = []
+        price_details = []
 
         for position in group:
             numeric_price = clean_price(position.get("price", "не указано"))
-            if numeric_price is not None:
-                prices.append(numeric_price)
 
-        if len(prices) > 1:
-            min_price = min(prices)
-            max_price = max(prices)
+            if numeric_price is not None:
+                price_details.append(
+                    (
+                        numeric_price,
+                        position.get("supplier", "не указано")
+                    )
+                )
+
+        if len(price_details) > 1:
+            min_price, min_supplier = min(price_details, key=lambda x: x[0])
+            max_price, max_supplier = max(price_details, key=lambda x: x[0])
 
             if min_price > 0 and max_price / min_price > 3:
                 ws_match_control.append([
                     key,
                     "Большой разброс цен",
                     "Предупреждение",
-                    f"{min_price} → {max_price}"
+                    f"{min_supplier}: {min_price} | {max_supplier}: {max_price}"
                 ])
+        names = sorted(set(
+            str(position.get("name", "не указано")).strip()
+            for position in group
+            if str(position.get("name", "не указано")).strip()
+        ))
+
+        if len(names) > 3:
+            ws_match_control.append([
+                key,
+                "Много разных наименований в одной группе",
+                "Предупреждение",
+                " | ".join(names[:5])
+            ])
     style_sheet(ws_match_control, {
         "A": 30,
         "B": 35,
