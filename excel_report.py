@@ -230,7 +230,8 @@ def create_procurement_report(items: list, output_path: str):
             supplier_stats[supplier] = {
                 "wins": 0,
                 "sum_wins": 0,
-                "positions": 0
+                "positions": 0,
+                "total_amount": clean_price(item.get("total_amount"))
             }
 
         for position in item.get("items", []):
