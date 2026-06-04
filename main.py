@@ -47,6 +47,57 @@ main_keyboard = ReplyKeyboardMarkup(
 )
 
 
+def is_missing_value(value):
+    normalized = str(value).strip().lower()
+
+    return normalized in ["", "не указано", "не указан", "none", "null"]
+
+
+def detect_supplier_from_text(text):
+    import re
+
+    patterns = [
+        r"ООО\s+[«\"A-ZА-ЯЁ][^\n\r,;]{2,80}",
+        r"АО\s+[«\"A-ZА-ЯЁ][^\n\r,;]{2,80}",
+        r"ИП\s+[A-ZА-ЯЁ][^\n\r,;]{2,80}",
+        r"ТОО\s+[«\"A-ZА-ЯЁ][^\n\r,;]{2,80}"
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+
+        if match:
+            supplier = match.group(0).strip()
+            supplier = re.sub(r"\s+", " ", supplier)
+            supplier = supplier.strip(" .:-")
+
+            return supplier
+
+    return "не указано"
+
+
+def detect_supplier_from_filename(file_name):
+    import re
+
+    name = str(file_name)
+    name = re.sub(r"\.(pdf|xlsx|xls)$", "", name, flags=re.IGNORECASE)
+    name = name.replace("_", " ")
+    name = name.replace("-", " ")
+    name = re.sub(r"\s+", " ", name).strip()
+
+    name = re.sub(r"\bКП\b", " ", name, flags=re.IGNORECASE)
+    name = re.sub(r"\b(ООО|ИП|АО|ТОО)\b", " ", name, flags=re.IGNORECASE)
+    name = re.sub(r"\bТД\s+УРАЛКРАН\b", " ", name, flags=re.IGNORECASE)
+    name = re.sub(r"\b\d{1,2}\s*\d{1,2}\s*\d{2,4}\b", " ", name)
+    name = re.sub(r"\b\d{6,}\b", " ", name)
+    name = re.sub(r"\s+", " ", name).strip()
+
+    if len(name) < 3:
+        return "не указано"
+
+    return name
+
+
 def extract_text_from_pdf(file_path):
     text = ""
 
@@ -253,6 +304,28 @@ async def compare_handler(message: Message):
 
         for item in files:
             data = extract_kp_structure(item["text"][:12000])
+
+            if is_missing_value(data.get("supplier")):
+                detected_supplier = detect_supplier_from_text(
+                    item["text"][:12000]
+                )
+
+                if not is_missing_value(detected_supplier):
+                    data["supplier"] = detected_supplier
+
+            if is_missing_value(data.get("supplier")):
+                detected_supplier = detect_supplier_from_filename(
+                    item["file_name"]
+                )
+
+                if not is_missing_value(detected_supplier):
+                    data["supplier"] = detected_supplier
+
+            if is_missing_value(data.get("supplier")):
+                with open("debug_missing_supplier.txt", "w", encoding="utf-8") as debug_file:
+                    debug_file.write(item["file_name"] + "\n\n")
+                    debug_file.write(item["text"][:12000])
+
             data["file_name"] = item["file_name"]
             data["items"] = extract_kp_items(item["text"][:12000])
             structured_items.append(data)
@@ -270,6 +343,12 @@ async def compare_handler(message: Message):
         )
 
     except Exception as e:
+        import traceback
+
+        print("=" * 80)
+        traceback.print_exc()
+        print("=" * 80)
+
         await message.answer(f"Ошибка при сравнении:\n{e}")
 
 
