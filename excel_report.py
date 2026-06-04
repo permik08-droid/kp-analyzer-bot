@@ -123,6 +123,12 @@ def clean_price(price):
         return None
 
 
+def is_valid_supplier(supplier):
+    value = str(supplier).strip().lower()
+
+    return value not in ["", "не указано", "не указан", "none", "null"]
+
+
 def style_sheet(ws, widths):
     header_fill = PatternFill("solid", fgColor="D9EAF7")
     thin = Side(border_style="thin", color="999999")
@@ -226,6 +232,9 @@ def create_procurement_report(items: list, output_path: str):
         supplier = item.get("supplier", "не указано")
         file_name = item.get("file_name", "не указано")
 
+        if not is_valid_supplier(supplier):
+            continue
+
         if supplier not in supplier_stats:
             supplier_stats[supplier] = {
                 "wins": 0,
@@ -275,6 +284,9 @@ def create_procurement_report(items: list, output_path: str):
 
     for item in items:
         supplier = item.get("supplier", "не указано")
+
+        if not is_valid_supplier(supplier):
+            continue
 
         if supplier not in suppliers:
             suppliers.append(supplier)
@@ -604,7 +616,12 @@ def create_procurement_report(items: list, output_path: str):
             rating = "B"
         else:
             rating = "C"
-        comment = "Лидер по количеству минимальных цен" if wins > 0 else "Нет выигранных позиций"
+        if supplier == best_supplier and wins > 0:
+            comment = "Лидер по количеству минимальных цен"
+        elif wins > 0:
+            comment = "Есть выигранные позиции, но не лидер"
+        else:
+            comment = "Нет выигранных позиций"
 
         ws_summary.append([
             supplier,
@@ -716,6 +733,112 @@ def create_procurement_report(items: list, output_path: str):
         "G": 12,
         "H": 25
     })
+
+    # Лист 7 — Решение по закупке
+    ws_decision = wb.create_sheet("Решение по закупке")
+
+    ws_decision.append([
+        "Поставщик",
+        "Сумма КП",
+        "Рисков",
+        "Побед по позициям",
+        "Рейтинг",
+        "Решение",
+        "Комментарий для закупщика"
+    ])
+
+    decision_rows = []
+
+    for supplier, stat in supplier_stats.items():
+        if not is_valid_supplier(supplier):
+            continue
+
+        supplier_risks = len([
+            risk for risk in risks
+            if risk.get("supplier") == supplier
+        ])
+
+        wins = stat.get("wins", 0)
+        total_amount = stat.get("total_amount")
+
+        if supplier_risks <= 1:
+            rating = "A"
+        elif supplier_risks <= 3:
+            rating = "B"
+        else:
+            rating = "C"
+
+        score = wins * 10 - supplier_risks * 2
+
+        decision_rows.append({
+            "supplier": supplier,
+            "total_amount": total_amount,
+            "risks": supplier_risks,
+            "wins": wins,
+            "rating": rating,
+            "score": score
+        })
+
+    recommended_supplier = None
+
+    if decision_rows:
+        best_decision = max(
+            decision_rows,
+            key=lambda row: (
+                row["score"],
+                row["wins"],
+                -row["risks"],
+                -(row["total_amount"] or 0)
+            )
+        )
+        recommended_supplier = best_decision["supplier"]
+
+    for row in decision_rows:
+        supplier = row["supplier"]
+
+        if supplier == recommended_supplier:
+            decision = "Рекомендован"
+            comment = (
+                "Оптимальный вариант по совокупности факторов: "
+                "победы по позициям, количество рисков и сумма КП."
+            )
+        elif row["rating"] == "C":
+            decision = "Не рекомендуется"
+            comment = "Много рисков. Требуется дополнительная проверка условий КП."
+        else:
+            decision = "Резервный вариант"
+            comment = "Можно рассматривать как альтернативу при уточнении условий."
+
+        ws_decision.append([
+            supplier,
+            row["total_amount"],
+            row["risks"],
+            row["wins"],
+            row["rating"],
+            decision,
+            comment
+        ])
+
+    style_sheet(ws_decision, {
+        "A": 35,
+        "B": 18,
+        "C": 12,
+        "D": 18,
+        "E": 12,
+        "F": 22,
+        "G": 70
+    })
+
+    for row_idx in range(2, ws_decision.max_row + 1):
+        decision = ws_decision.cell(row=row_idx, column=6).value
+
+        if decision == "Рекомендован":
+            for col_idx in range(1, 8):
+                ws_decision.cell(row=row_idx, column=col_idx).fill = green_fill
+
+        elif decision == "Не рекомендуется":
+            for col_idx in range(1, 8):
+                ws_decision.cell(row=row_idx, column=col_idx).fill = red_fill
     # Лист 7 — Заключение
     ws_conclusion = wb.create_sheet("Заключение")
 
@@ -725,21 +848,25 @@ def create_procurement_report(items: list, output_path: str):
     ws_conclusion.append(["Всего КП", len(items)])
     ws_conclusion.append(["Всего уникальных позиций", total_positions])
     ws_conclusion.append(["Лидер по минимальным ценам", best_supplier or "не определён"])
+    ws_conclusion.append(["Рекомендованный поставщик", recommended_supplier or "не определён"])
     ws_conclusion.append(["Потенциальная экономия", total_saving])
     ws_conclusion.append(["Выявлено рисков закупки", len(risks)])
 
     ws_conclusion.append(["", ""])
-    ws_conclusion.append(["Рекомендация", ""])
+    ws_conclusion.append(["Рекомендация директору", ""])
 
-    if best_supplier:
+    if recommended_supplier:
         recommendation = (
-            f"По результатам анализа коммерческих предложений лидер по количеству "
-            f"минимальных цен — {best_supplier}. Рекомендуется дополнительно проверить "
-            f"сроки поставки, условия оплаты, наличие товара, гарантию и включение доставки."
+            f"По результатам анализа коммерческих предложений рекомендуется выбрать "
+            f"поставщика {recommended_supplier}. Выбор сделан по совокупности факторов: "
+            f"количество минимальных цен по позициям, количество выявленных рисков и сумма КП. "
+            f"Перед заключением договора рекомендуется дополнительно подтвердить сроки поставки, "
+            f"условия оплаты, гарантию, наличие товара и включение доставки в стоимость."
         )
     else:
         recommendation = (
-            "Победитель не определён. Рекомендуется проверить корректность цен и наименований позиций."
+            "Рекомендованный поставщик не определён. Необходимо проверить корректность цен, "
+            "наименований позиций и исходных данных КП."
         )
 
     ws_conclusion.append(["Текст заключения", recommendation])
@@ -749,6 +876,7 @@ def create_procurement_report(items: list, output_path: str):
         "B": 90
     })
 
-    ws_conclusion["B8"].fill = yellow_fill
+    ws_conclusion["B9"].fill = yellow_fill
+    ws_conclusion["B10"].fill = yellow_fill
 
     wb.save(output_path)
