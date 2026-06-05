@@ -32,9 +32,17 @@ def normalize_match_key(value: str) -> str:
     text = text.replace("Ё", "Е")
     text = text.replace("Х", "X")
     text = text.replace(",", ".")
+    text = text.replace("-", " ")
+    text = text.replace("/", " ")
+    text = text.replace("_", " ")
+    text = text.replace(" L", " ")
 
     text = re.sub(r"[^A-ZА-Я0-9.]+", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
+
+    bt_er_match = re.search(r"BT\s*(\d+)\s+ER\s*(\d+)\s+(\d+)", text)
+    if bt_er_match:
+        return f"BT{bt_er_match.group(1)} ER{bt_er_match.group(2)} {bt_er_match.group(3)}"
 
     if "PZS" in text and re.search(r"\d+\s*AH", text):
         text = re.sub(r"\b\d+\s*V\b", "", text)

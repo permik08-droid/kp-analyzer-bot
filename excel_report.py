@@ -11,12 +11,16 @@ def get_position_key(name: str) -> str:
     text = text.replace("×", "X")
     text = text.replace("Х", "X")
     text = text.replace("-", " ")
+    text = text.replace("/", " ")
+    text = text.replace("_", " ")
+    text = text.replace(" L", " ")
     text = text.replace("CKB", "СКВ")
     text = text.replace("CK", "СК")
     text = re.sub(r"[.,;:(){}\[\]\"']", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
 
     patterns = [
+        r"BT\d+\s+ER\d+\s+\d+",
         r"BT\d+\s+СКВ\d+\s+\d+",
         r"BT\d+\s+CKB\d+\s+\d+",
         r"СКВ\d+\s+TWN\d+\s+\d+",
@@ -62,6 +66,7 @@ def extract_article(name):
     text = re.sub(r"\s+", " ", text).strip()
 
     patterns = [
+        r"BT\d+\s+ER\d+\s+\d+",
         r"BT\d+\s+СКВ\d+\s+\d+",
         r"BT\d+\s+CKB\d+\s+\d+",
         r"СКВ\d+\s+TWN\d+\s+\d+",
