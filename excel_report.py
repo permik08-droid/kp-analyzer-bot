@@ -929,6 +929,7 @@ def create_procurement_report(items: list, output_path: str):
             "supplier": supplier,
             "total_amount": total_amount,
             "risks": supplier_risks,
+            "risk_score": risk_score,
             "wins": wins,
             "rating": rating,
             "score": score
@@ -983,13 +984,17 @@ def create_procurement_report(items: list, output_path: str):
 
             if supplier_risk_names:
                 comment = (
-                    "Рекомендован по результатам сравнения ценовых предложений. "
+                    f"Рекомендован по результатам сравнения ценовых предложений. "
+                    f"Побед по позициям: {row['wins']}. "
+                    f"Вес рисков: {row['risk_score']}. "
                     "Требуется дополнительная проверка: "
                     + ", ".join(supplier_risk_names[:3]) + "."
                 )
             else:
                 comment = (
-                    "Рекомендован по результатам сравнения ценовых предложений. "
+                    f"Рекомендован по результатам сравнения ценовых предложений. "
+                    f"Побед по позициям: {row['wins']}. "
+                    f"Вес рисков: {row['risk_score']}. "
                     "Существенных рисков не выявлено."
                 )
         elif row["rating"] == "C" and row["wins"] > 0:
