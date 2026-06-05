@@ -44,6 +44,18 @@ def normalize_match_key(value: str) -> str:
     if bt_er_match:
         return f"BT{bt_er_match.group(1)} ER{bt_er_match.group(2)} {bt_er_match.group(3)}"
 
+    hsk_match = re.search(r"HSK\s*(\d+[A-Z]?)\s+ER\s*(\d+)", text)
+    if hsk_match:
+        return f"HSK{hsk_match.group(1)} ER{hsk_match.group(2)}"
+
+    sk_match = re.search(r"\bSK\s*(\d+)\s+ER\s*(\d+)\b", text)
+    if sk_match:
+        return f"SK{sk_match.group(1)} ER{sk_match.group(2)}"
+
+    metric_match = re.search(r"\bM\s*(\d+)\s*X\s*(\d+(?:\.\d+)?)\b", text)
+    if metric_match:
+        return f"M{metric_match.group(1)}X{metric_match.group(2)}"
+
     if "PZS" in text and re.search(r"\d+\s*AH", text):
         text = re.sub(r"\b\d+\s*V\b", "", text)
         text = re.sub(r"\s+", " ", text).strip()

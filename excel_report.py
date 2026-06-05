@@ -16,6 +16,11 @@ def get_position_key(name: str) -> str:
     text = text.replace(" L", " ")
     text = text.replace("CKB", "СКВ")
     text = text.replace("CK", "СК")
+
+    metric_match = re.search(r"\bM\s*(\d+)\s*X\s*(\d+(?:\.\d+)?)\b", text)
+    if metric_match:
+        return f"M{metric_match.group(1)}X{metric_match.group(2)}"
+
     text = re.sub(r"[.,;:(){}\[\]\"']", " ", text)
     text = re.sub(r"\s+", " ", text).strip()
 
