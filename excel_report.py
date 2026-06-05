@@ -25,6 +25,9 @@ def get_position_key(name: str) -> str:
     text = re.sub(r"\s+", " ", text).strip()
 
     patterns = [
+        r"BT\d+\s+BK\d+\s+\d+",
+        r"BT\d+\s+BST\s+\d+",
+        r"BT\d+\s+DM\d+\s+\d+",
         r"BT\d+\s+ER\d+\s+\d+",
         r"BT\d+\s+СКВ\d+\s+\d+",
         r"BT\d+\s+CKB\d+\s+\d+",
