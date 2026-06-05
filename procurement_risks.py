@@ -1,4 +1,5 @@
 import re
+from datetime import datetime
 
 
 def normalize(value):
@@ -20,6 +21,26 @@ def extract_days(value):
         return None
 
     return int(numbers[0])
+
+
+def get_company_age_months(value):
+    if is_empty(value):
+        return None
+
+    text = str(value).strip()
+
+    try:
+        registration_date = datetime.strptime(text, "%d.%m.%Y")
+    except Exception:
+        return None
+
+    today = datetime.today()
+    months = (today.year - registration_date.year) * 12 + today.month - registration_date.month
+
+    if today.day < registration_date.day:
+        months -= 1
+
+    return max(months, 0)
 
 
 def analyze_procurement_risks(items):
@@ -48,6 +69,26 @@ def analyze_procurement_risks(items):
         country = item.get("country")
         valid_until = item.get("valid_until")
         total_amount = item.get("total_amount")
+        company_age_months = get_company_age_months(item.get("dadata_registration_date"))
+
+        if company_age_months is not None and company_age_months < 6:
+            risks.append({
+                "supplier": supplier,
+                "risk": "Компания зарегистрирована менее 6 месяцев назад",
+                "level": "Высокий",
+                "field": "Дата регистрации DaData",
+                "value": item.get("dadata_registration_date", "не указано"),
+                "comment": "Компания зарегистрирована недавно. Нужно дополнительно проверить надежность поставщика, опыт поставок и документы."
+            })
+        elif company_age_months is not None and company_age_months < 12:
+            risks.append({
+                "supplier": supplier,
+                "risk": "Компания зарегистрирована менее 1 года назад",
+                "level": "Средний",
+                "field": "Дата регистрации DaData",
+                "value": item.get("dadata_registration_date", "не указано"),
+                "comment": "Компания работает менее одного года. Желательно дополнительно проверить опыт поставщика и исполненные поставки."
+            })
 
         if "100" in payment_terms or "полная предоплата" in payment_terms:
             risks.append({
