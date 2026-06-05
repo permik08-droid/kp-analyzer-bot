@@ -156,7 +156,11 @@ def check_company_by_inn(inn):
         "dadata_inn": inn,
         "dadata_kpp": "не проверялось",
         "dadata_ogrn": "не проверялось",
-        "dadata_status": "не проверялось"
+        "dadata_status": "не проверялось",
+        "dadata_address": "не проверялось",
+        "dadata_director": "не проверялось",
+        "dadata_okved": "не проверялось",
+        "dadata_registration_date": "не проверялось"
     }
 
     if is_missing_value(inn) or not DADATA_API_KEY:
@@ -191,6 +195,20 @@ def check_company_by_inn(inn):
         result["dadata_kpp"] = data.get("kpp") or "не указано"
         result["dadata_ogrn"] = data.get("ogrn") or "не указано"
         result["dadata_status"] = data.get("state", {}).get("status") or "не указано"
+        result["dadata_address"] = data.get("address", {}).get("value") or "не указано"
+        result["dadata_director"] = data.get("management", {}).get("name") or "не указано"
+        result["dadata_okved"] = data.get("okved") or "не указано"
+        registration_date = data.get("state", {}).get("registration_date")
+        if registration_date:
+            try:
+                from datetime import datetime
+                result["dadata_registration_date"] = datetime.fromtimestamp(
+                    int(registration_date) / 1000
+                ).strftime("%d.%m.%Y")
+            except Exception:
+                result["dadata_registration_date"] = str(registration_date)
+        else:
+            result["dadata_registration_date"] = "не указано"
 
         return result
 
@@ -459,6 +477,10 @@ async def compare_handler(message: Message):
             data["dadata_kpp"] = company_check.get("dadata_kpp", "не проверялось")
             data["dadata_ogrn"] = company_check.get("dadata_ogrn", "не проверялось")
             data["dadata_status"] = company_check.get("dadata_status", "не проверялось")
+            data["dadata_address"] = company_check.get("dadata_address", "не проверялось")
+            data["dadata_director"] = company_check.get("dadata_director", "не проверялось")
+            data["dadata_okved"] = company_check.get("dadata_okved", "не проверялось")
+            data["dadata_registration_date"] = company_check.get("dadata_registration_date", "не проверялось")
 
             if is_missing_value(data.get("ogrn")) and not is_missing_value(data.get("dadata_ogrn")):
                 data["ogrn"] = data["dadata_ogrn"]

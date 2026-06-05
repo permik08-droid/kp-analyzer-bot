@@ -136,6 +136,9 @@ def get_risk_weight(risk):
     risk_weights = {
         "инн поставщика не найден": 10,
         "огрн поставщика не найден": 8,
+        "организация ликвидирована": 15,
+        "организация банкрот": 15,
+        "организация в процессе ликвидации": 10,
         "аномально низкая цена": 8,
         "100% предоплата": 5,
         "срок поставки не указан": 3,
@@ -172,7 +175,9 @@ def get_supplier_risk_score(supplier_risks):
 def has_blocking_risk(supplier_risks):
     blocking_risks = [
         "инн поставщика не найден",
-        "аномально низкая цена"
+        "аномально низкая цена",
+        "организация ликвидирована",
+        "организация банкрот"
     ]
 
     for risk in supplier_risks:
@@ -774,6 +779,10 @@ def create_procurement_report(items: list, output_path: str):
         "КПП",
         "DaData ОГРН",
         "Статус DaData",
+        "Адрес DaData",
+        "Руководитель DaData",
+        "ОКВЭД DaData",
+        "Дата регистрации DaData",
         "Производитель",
         "Страна",
         "НДС",
@@ -818,6 +827,10 @@ def create_procurement_report(items: list, output_path: str):
             item.get("dadata_kpp", "не проверялось"),
             item.get("dadata_ogrn", "не проверялось"),
             item.get("dadata_status", "не проверялось"),
+            item.get("dadata_address", "не проверялось"),
+            item.get("dadata_director", "не проверялось"),
+            item.get("dadata_okved", "не проверялось"),
+            item.get("dadata_registration_date", "не проверялось"),
             item.get("manufacturer", "не указано"),
             item.get("country", "не указано"),
             item.get("vat", "не указано"),
@@ -839,29 +852,33 @@ def create_procurement_report(items: list, output_path: str):
         "G": 18,
         "H": 18,
         "I": 18,
-        "J": 18,
+        "J": 55,
         "K": 30,
         "L": 18,
-        "M": 18,
-        "N": 20,
-        "O": 15,
-        "P": 12,
+        "M": 22,
+        "N": 18,
+        "O": 30,
+        "P": 18,
         "Q": 18,
-        "R": 12,
-        "S": 25
+        "R": 20,
+        "S": 15,
+        "T": 12,
+        "U": 18,
+        "V": 12,
+        "W": 25
     })
 
     for row_idx in range(2, ws_supplier_check.max_row + 1):
-        rating = ws_supplier_check.cell(row=row_idx, column=18).value
+        rating = ws_supplier_check.cell(row=row_idx, column=22).value
 
         if rating == "A":
-            for col_idx in range(1, 20):
+            for col_idx in range(1, 24):
                 ws_supplier_check.cell(row=row_idx, column=col_idx).fill = green_fill
         elif rating == "B":
-            for col_idx in range(1, 20):
+            for col_idx in range(1, 24):
                 ws_supplier_check.cell(row=row_idx, column=col_idx).fill = yellow_fill
         elif rating == "C":
-            for col_idx in range(1, 20):
+            for col_idx in range(1, 24):
                 ws_supplier_check.cell(row=row_idx, column=col_idx).fill = red_fill
 
     # Лист 7 — Решение по закупке

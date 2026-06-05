@@ -181,4 +181,36 @@ def analyze_procurement_risks(items):
                 "comment": "В КП не найден ОГРН или ОГРНИП. Желательно запросить полные реквизиты."
             })
 
+        dadata_status = normalize(item.get("dadata_status"))
+
+        if dadata_status in ["liquidated", "ликвидирована", "ликвидировано"]:
+            risks.append({
+                "supplier": supplier,
+                "risk": "Организация ликвидирована",
+                "level": "Высокий",
+                "field": "Статус DaData",
+                "value": item.get("dadata_status", "не указано"),
+                "comment": "По данным DaData организация ликвидирована. Закупку у такого поставщика нельзя рекомендовать."
+            })
+
+        if dadata_status in ["liquidating", "ликвидируется", "в процессе ликвидации"]:
+            risks.append({
+                "supplier": supplier,
+                "risk": "Организация в процессе ликвидации",
+                "level": "Высокий",
+                "field": "Статус DaData",
+                "value": item.get("dadata_status", "не указано"),
+                "comment": "По данным DaData организация находится в процессе ликвидации. Требуется дополнительная проверка."
+            })
+
+        if dadata_status in ["bankrupt", "банкрот", "банкротство"]:
+            risks.append({
+                "supplier": supplier,
+                "risk": "Организация банкрот",
+                "level": "Высокий",
+                "field": "Статус DaData",
+                "value": item.get("dadata_status", "не указано"),
+                "comment": "По данным DaData есть признаки банкротства. Закупку у такого поставщика нельзя рекомендовать."
+            })
+
     return risks
