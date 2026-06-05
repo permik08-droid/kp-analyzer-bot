@@ -21,6 +21,7 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+DADATA_API_KEY = os.getenv("DADATA_API_KEY")
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -51,6 +52,23 @@ def is_missing_value(value):
     normalized = str(value).strip().lower()
 
     return normalized in ["", "не указано", "не указан", "none", "null"]
+
+
+def clean_number(value):
+    import re
+
+    text = str(value)
+    text = text.replace(" ", "")
+    text = text.replace(",", ".")
+    text = re.sub(r"[^0-9.]", "", text)
+
+    if not text:
+        return None
+
+    try:
+        return float(text)
+    except Exception:
+        return None
 
 
 def detect_supplier_from_text(text):
@@ -98,6 +116,89 @@ def detect_supplier_from_filename(file_name):
     return name
 
 
+def detect_requisites_from_text(text):
+    import re
+
+    result = {
+        "inn": "не указано",
+        "ogrn": "не указано"
+    }
+
+    inn_match = re.search(
+        r"ИНН[^0-9]{0,40}(\d{10}|\d{12})",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    if inn_match:
+        result["inn"] = inn_match.group(1)
+
+    ogrn_match = re.search(
+        r"ОГРН(?:ИП|ЮЛ)?[^0-9]{0,50}(\d[\d\s\-]{11,20}\d)",
+        text,
+        flags=re.IGNORECASE
+    )
+
+    if ogrn_match:
+        ogrn = re.sub(r"\D", "", ogrn_match.group(1))
+
+        if len(ogrn) in [13, 15]:
+            result["ogrn"] = ogrn
+
+    return result
+
+
+def check_company_by_inn(inn):
+    import requests
+
+    result = {
+        "dadata_name": "не проверялось",
+        "dadata_inn": inn,
+        "dadata_kpp": "не проверялось",
+        "dadata_ogrn": "не проверялось",
+        "dadata_status": "не проверялось"
+    }
+
+    if is_missing_value(inn) or not DADATA_API_KEY:
+        return result
+
+    try:
+        response = requests.post(
+            "https://suggestions.dadata.ru/suggestions/api/4_1/rs/findById/party",
+            headers={
+                "Authorization": f"Token {DADATA_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "query": inn
+            },
+            timeout=10
+        )
+
+        if response.status_code != 200:
+            result["dadata_status"] = f"ошибка API {response.status_code}"
+            return result
+
+        suggestions = response.json().get("suggestions", [])
+
+        if not suggestions:
+            result["dadata_status"] = "не найдено"
+            return result
+
+        data = suggestions[0].get("data", {})
+
+        result["dadata_name"] = suggestions[0].get("value", "не указано")
+        result["dadata_kpp"] = data.get("kpp") or "не указано"
+        result["dadata_ogrn"] = data.get("ogrn") or "не указано"
+        result["dadata_status"] = data.get("state", {}).get("status") or "не указано"
+
+        return result
+
+    except Exception as e:
+        result["dadata_status"] = f"ошибка: {e}"
+        return result
+
+
 def extract_text_from_pdf(file_path):
     text = ""
 
@@ -108,14 +209,16 @@ def extract_text_from_pdf(file_path):
 
     text = text.strip()
 
-    if len(text) > 100:
+    requisites = detect_requisites_from_text(text)
+
+    if not is_missing_value(requisites.get("inn")) and len(text) > 100:
         return text
 
-    # Если текста мало — считаем, что это скан, и запускаем OCR
+    # Если ИНН не найден, дополнительно запускаем OCR
     ocr_text = ""
 
     try:
-        pages = convert_from_path(file_path, dpi=200)
+        pages = convert_from_path(file_path, dpi=300)
 
         for page in pages:
             page_text = pytesseract.image_to_string(
@@ -124,7 +227,24 @@ def extract_text_from_pdf(file_path):
             )
             ocr_text += page_text + "\n"
 
-        return ocr_text.strip()
+        if pages:
+            last_page = pages[-1]
+            width, height = last_page.size
+            bottom_part = last_page.crop((0, int(height * 0.65), width, height))
+
+            bottom_text = pytesseract.image_to_string(
+                bottom_part,
+                lang="rus+eng",
+                config="--psm 6"
+            )
+            ocr_text += "\n" + bottom_text + "\n"
+
+        combined_text = (text + "\n" + ocr_text).strip()
+
+        if combined_text:
+            return combined_text
+
+        return text
 
     except Exception as e:
         return text
@@ -321,13 +441,49 @@ async def compare_handler(message: Message):
                 if not is_missing_value(detected_supplier):
                     data["supplier"] = detected_supplier
 
-            if is_missing_value(data.get("supplier")):
-                with open("debug_missing_supplier.txt", "w", encoding="utf-8") as debug_file:
-                    debug_file.write(item["file_name"] + "\n\n")
-                    debug_file.write(item["text"][:12000])
+            requisites = detect_requisites_from_text(
+                item["text"]
+            )
+
+            if is_missing_value(data.get("inn")):
+                data["inn"] = requisites.get("inn", "не указано")
+
+            if is_missing_value(data.get("ogrn")):
+                data["ogrn"] = requisites.get("ogrn", "не указано")
+
+            company_check = check_company_by_inn(
+                data.get("inn", "не указано")
+            )
+
+            data["dadata_name"] = company_check.get("dadata_name", "не проверялось")
+            data["dadata_kpp"] = company_check.get("dadata_kpp", "не проверялось")
+            data["dadata_ogrn"] = company_check.get("dadata_ogrn", "не проверялось")
+            data["dadata_status"] = company_check.get("dadata_status", "не проверялось")
+
+            if is_missing_value(data.get("ogrn")) and not is_missing_value(data.get("dadata_ogrn")):
+                data["ogrn"] = data["dadata_ogrn"]
 
             data["file_name"] = item["file_name"]
             data["items"] = extract_kp_items(item["text"][:12000])
+
+            if is_missing_value(data.get("total_amount")):
+                items_total = 0
+
+                for position in data["items"]:
+                    amount = clean_number(position.get("amount"))
+
+                    if amount:
+                        items_total += amount
+                        continue
+
+                    quantity = clean_number(position.get("quantity"))
+                    price = clean_number(position.get("price"))
+
+                    if quantity and price:
+                        items_total += quantity * price
+
+                if items_total > 0:
+                    data["total_amount"] = round(items_total, 2)
             structured_items.append(data)
 
         create_procurement_report(structured_items, report_path)

@@ -161,5 +161,24 @@ def analyze_procurement_risks(items):
                 "value": item.get("total_amount", "не указано"),
                 "comment": "Не удалось определить общую сумму КП. Нужно проверить файл вручную."
             })
+        if is_empty(item.get("inn")):
+            risks.append({
+                "supplier": supplier,
+                "risk": "ИНН поставщика не найден",
+                "level": "Средний",
+                "field": "ИНН",
+                "value": item.get("inn", "не указано"),
+                "comment": "В КП не найден ИНН поставщика. Нужно запросить реквизиты или проверить контрагента."
+            })
+
+        if is_empty(item.get("ogrn")):
+            risks.append({
+                "supplier": supplier,
+                "risk": "ОГРН поставщика не найден",
+                "level": "Низкий",
+                "field": "ОГРН",
+                "value": item.get("ogrn", "не указано"),
+                "comment": "В КП не найден ОГРН или ОГРНИП. Желательно запросить полные реквизиты."
+            })
 
     return risks
