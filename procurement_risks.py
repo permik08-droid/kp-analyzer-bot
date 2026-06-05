@@ -43,6 +43,16 @@ def get_company_age_months(value):
     return max(months, 0)
 
 
+def is_suspicious_okved(value):
+    if is_empty(value):
+        return False
+
+    okved = str(value).strip().replace(",", ".")
+    suspicious_prefixes = ["49", "55", "56", "93", "96"]
+
+    return any(okved.startswith(prefix) for prefix in suspicious_prefixes)
+
+
 def analyze_procurement_risks(items):
     risks = []
 
@@ -70,6 +80,17 @@ def analyze_procurement_risks(items):
         valid_until = item.get("valid_until")
         total_amount = item.get("total_amount")
         company_age_months = get_company_age_months(item.get("dadata_registration_date"))
+        dadata_okved = item.get("dadata_okved")
+
+        if is_suspicious_okved(dadata_okved):
+            risks.append({
+                "supplier": supplier,
+                "risk": "ОКВЭД поставщика выглядит непрофильным",
+                "level": "Средний",
+                "field": "ОКВЭД DaData",
+                "value": item.get("dadata_okved", "не указано"),
+                "comment": "Основной ОКВЭД поставщика выглядит непрофильным для закупки оборудования или материалов. Нужно проверить, действительно ли поставщик работает с данным товаром."
+            })
 
         if company_age_months is not None and company_age_months < 6:
             risks.append({
