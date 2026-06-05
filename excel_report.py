@@ -126,7 +126,86 @@ def clean_price(price):
 def is_valid_supplier(supplier):
     value = str(supplier).strip().lower()
 
-    return value not in ["", "не указано", "не указан", "none", "null"]
+    return value not in ["", "не указано", "не указан", "не проверялось", "none", "null"]
+
+
+def get_risk_weight(risk):
+    risk_name = str(risk.get("risk", "")).strip().lower()
+    level = str(risk.get("level", "")).strip().lower()
+
+    risk_weights = {
+        "инн поставщика не найден": 10,
+        "огрн поставщика не найден": 8,
+        "аномально низкая цена": 8,
+        "100% предоплата": 5,
+        "срок поставки не указан": 3,
+        "срок поставки больше конкурентов": 3,
+        "гарантия не указана": 2,
+        "условия оплаты не указаны": 2,
+        "доставка отдельно": 2,
+        "ндс отсутствует или не указан": 2,
+        "сумма кп не определена": 2,
+        "производитель не указан": 1,
+        "страна происхождения не указана": 1,
+        "срок действия кп не указан": 1
+    }
+
+    if risk_name in risk_weights:
+        return risk_weights[risk_name]
+
+    if level == "высокий":
+        return 5
+
+    if level == "средний":
+        return 2
+
+    if level == "низкий":
+        return 1
+
+    return 1
+
+
+def get_supplier_risk_score(supplier_risks):
+    return sum(get_risk_weight(risk) for risk in supplier_risks)
+
+
+def has_blocking_risk(supplier_risks):
+    blocking_risks = [
+        "инн поставщика не найден",
+        "аномально низкая цена"
+    ]
+
+    for risk in supplier_risks:
+        risk_name = str(risk.get("risk", "")).strip().lower()
+        if risk_name in blocking_risks:
+            return True
+
+    return False
+
+
+def get_supplier_rating(risk_score, supplier_risks=None):
+    supplier_risks = supplier_risks or []
+
+    if has_blocking_risk(supplier_risks):
+        return "C"
+
+    if risk_score <= 2:
+        return "A"
+
+    if risk_score <= 10:
+        return "B"
+
+    return "C"
+
+
+def get_supplier_score_text(rating):
+    if rating == "A":
+        return "Надёжный"
+
+    if rating == "B":
+        return "Требует проверки"
+
+    return "Высокий риск"
 
 
 def style_sheet(ws, widths):
@@ -598,24 +677,27 @@ def create_procurement_report(items: list, output_path: str):
 
     best_supplier = None
     best_wins = -1
+    best_sum_wins = 0
 
     for supplier, stat in supplier_stats.items():
         wins = stat.get("wins", 0)
+        sum_wins = stat.get("sum_wins", 0)
 
-        if wins > best_wins:
+        if wins > best_wins or (wins == best_wins and sum_wins > best_sum_wins):
             best_wins = wins
+            best_sum_wins = sum_wins
             best_supplier = supplier
-        supplier_risks = len([
+
+    for supplier, stat in supplier_stats.items():
+        wins = stat.get("wins", 0)
+        supplier_risk_items = [
             risk for risk in risks
             if risk.get("supplier") == supplier
-        ])
+        ]
+        supplier_risks = len(supplier_risk_items)
+        risk_score = get_supplier_risk_score(supplier_risk_items)
+        rating = get_supplier_rating(risk_score, supplier_risk_items)
 
-        if supplier_risks <= 1:
-            rating = "A"
-        elif supplier_risks <= 3:
-            rating = "B"
-        else:
-            rating = "C"
         if supplier == best_supplier and wins > 0:
             comment = "Лидер по количеству минимальных цен"
         elif wins > 0:
@@ -684,12 +766,22 @@ def create_procurement_report(items: list, output_path: str):
 
     ws_supplier_check.append([
         "Поставщик",
+        "ИНН",
+        "ИНН найден",
+        "ОГРН",
+        "ОГРН найден",
+        "DaData название",
+        "КПП",
+        "DaData ОГРН",
+        "Статус DaData",
         "Производитель",
         "Страна",
         "НДС",
         "Гарантия",
         "Предоплата",
         "Рисков",
+        "Побед по позициям",
+        "Рейтинг",
         "Оценка"
     ])
 
@@ -704,35 +796,73 @@ def create_procurement_report(items: list, output_path: str):
         prepayment = "Да" if "100" in payment_terms or "полная предоплата" in payment_terms else "Нет"
 
         risks_count = len(supplier_risks)
+        wins_count = supplier_stats.get(supplier, {}).get("wins", 0)
 
-        if risks_count <= 1:
-            supplier_score = "Надёжный"
-        elif risks_count <= 3:
-            supplier_score = "Требует проверки"
-        else:
-            supplier_score = "Высокий риск"
+        inn = item.get("inn", "не указано")
+        ogrn = item.get("ogrn", "не указано")
+
+        inn_found = "Да" if is_valid_supplier(inn) else "Нет"
+        ogrn_found = "Да" if is_valid_supplier(ogrn) else "Нет"
+
+        risk_score = get_supplier_risk_score(supplier_risks)
+        rating = get_supplier_rating(risk_score, supplier_risks)
+        supplier_score = get_supplier_score_text(rating)
 
         ws_supplier_check.append([
             supplier,
+            inn,
+            inn_found,
+            ogrn,
+            ogrn_found,
+            item.get("dadata_name", "не проверялось"),
+            item.get("dadata_kpp", "не проверялось"),
+            item.get("dadata_ogrn", "не проверялось"),
+            item.get("dadata_status", "не проверялось"),
             item.get("manufacturer", "не указано"),
             item.get("country", "не указано"),
             item.get("vat", "не указано"),
             item.get("warranty", "не указано"),
             prepayment,
             risks_count,
+            wins_count,
+            rating,
             supplier_score
         ])
 
     style_sheet(ws_supplier_check, {
         "A": 35,
-        "B": 30,
-        "C": 18,
+        "B": 18,
+        "C": 14,
         "D": 18,
-        "E": 20,
-        "F": 15,
-        "G": 12,
-        "H": 25
+        "E": 14,
+        "F": 45,
+        "G": 18,
+        "H": 18,
+        "I": 18,
+        "J": 18,
+        "K": 30,
+        "L": 18,
+        "M": 18,
+        "N": 20,
+        "O": 15,
+        "P": 12,
+        "Q": 18,
+        "R": 12,
+        "S": 25
     })
+
+    for row_idx in range(2, ws_supplier_check.max_row + 1):
+        rating = ws_supplier_check.cell(row=row_idx, column=18).value
+
+        if rating == "A":
+            for col_idx in range(1, 20):
+                ws_supplier_check.cell(row=row_idx, column=col_idx).fill = green_fill
+        elif rating == "B":
+            for col_idx in range(1, 20):
+                ws_supplier_check.cell(row=row_idx, column=col_idx).fill = yellow_fill
+        elif rating == "C":
+            for col_idx in range(1, 20):
+                ws_supplier_check.cell(row=row_idx, column=col_idx).fill = red_fill
 
     # Лист 7 — Решение по закупке
     ws_decision = wb.create_sheet("Решение по закупке")
@@ -753,22 +883,25 @@ def create_procurement_report(items: list, output_path: str):
         if not is_valid_supplier(supplier):
             continue
 
-        supplier_risks = len([
+        supplier_risk_items = [
             risk for risk in risks
             if risk.get("supplier") == supplier
-        ])
+        ]
+        supplier_risks = len(supplier_risk_items)
+        risk_score = get_supplier_risk_score(supplier_risk_items)
 
         wins = stat.get("wins", 0)
         total_amount = stat.get("total_amount")
 
-        if supplier_risks <= 1:
-            rating = "A"
-        elif supplier_risks <= 3:
-            rating = "B"
-        else:
-            rating = "C"
+        rating = get_supplier_rating(risk_score, supplier_risk_items)
 
-        score = wins * 10 - supplier_risks * 2
+        rating_penalty = {
+            "A": 0,
+            "B": 10,
+            "C": 35
+        }.get(rating, 35)
+
+        score = wins * 5 - risk_score * 2 - rating_penalty
 
         decision_rows.append({
             "supplier": supplier,
@@ -781,9 +914,24 @@ def create_procurement_report(items: list, output_path: str):
 
     recommended_supplier = None
 
-    if decision_rows:
+    a_suppliers = [
+        row for row in decision_rows
+        if row["wins"] > 0 and row["rating"] == "A"
+    ]
+
+    b_suppliers = [
+        row for row in decision_rows
+        if row["wins"] > 0 and row["rating"] == "B"
+    ]
+
+    if a_suppliers:
+        valid_decision_rows = a_suppliers
+    else:
+        valid_decision_rows = b_suppliers
+
+    if valid_decision_rows:
         best_decision = max(
-            decision_rows,
+            valid_decision_rows,
             key=lambda row: (
                 row["score"],
                 row["wins"],
@@ -798,13 +946,39 @@ def create_procurement_report(items: list, output_path: str):
 
         if supplier == recommended_supplier:
             decision = "Рекомендован"
+
+            supplier_risk_names = [
+                risk.get("risk", "")
+                for risk in sorted(
+                    [
+                        risk for risk in risks
+                        if risk.get("supplier") == supplier
+                    ],
+                    key=get_risk_weight,
+                    reverse=True
+                )
+            ]
+
+            if supplier_risk_names:
+                comment = (
+                    "Рекомендован по результатам сравнения ценовых предложений. "
+                    "Требуется дополнительная проверка: "
+                    + ", ".join(supplier_risk_names[:3]) + "."
+                )
+            else:
+                comment = (
+                    "Рекомендован по результатам сравнения ценовых предложений. "
+                    "Существенных рисков не выявлено."
+                )
+        elif row["rating"] == "C" and row["wins"] > 0:
+            decision = "Требует согласования руководителя"
             comment = (
-                "Оптимальный вариант по совокупности факторов: "
-                "победы по позициям, количество рисков и сумма КП."
+                "Поставщик имеет минимальные цены по позициям, но рейтинг C из-за количества рисков. "
+                "Перед выбором требуется отдельное согласование руководителя."
             )
         elif row["rating"] == "C":
             decision = "Не рекомендуется"
-            comment = "Много рисков. Требуется дополнительная проверка условий КП."
+            comment = "Много рисков и нет побед по позициям."
         else:
             decision = "Резервный вариант"
             comment = "Можно рассматривать как альтернативу при уточнении условий."
