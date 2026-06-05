@@ -792,6 +792,7 @@ def create_procurement_report(items: list, output_path: str):
         "Гарантия",
         "Предоплата",
         "Рисков",
+        "Вес рисков",
         "Побед по позициям",
         "Рейтинг",
         "Оценка"
@@ -840,6 +841,7 @@ def create_procurement_report(items: list, output_path: str):
             item.get("warranty", "не указано"),
             prepayment,
             risks_count,
+            risk_score,
             wins_count,
             rating,
             supplier_score
@@ -1043,6 +1045,17 @@ def create_procurement_report(items: list, output_path: str):
     ws_conclusion.append(["Всего уникальных позиций", total_positions])
     ws_conclusion.append(["Лидер по минимальным ценам", best_supplier or "не определён"])
     ws_conclusion.append(["Рекомендованный поставщик", recommended_supplier or "не определён"])
+    if recommended_supplier:
+        recommended_risk_items = [
+            risk for risk in risks
+            if risk.get("supplier") == recommended_supplier
+        ]
+        recommended_risk_score = get_supplier_risk_score(recommended_risk_items)
+        recommended_rating = get_supplier_rating(recommended_risk_score, recommended_risk_items)
+
+        ws_conclusion.append(["Рейтинг рекомендованного поставщика", recommended_rating])
+        ws_conclusion.append(["Количество рисков рекомендованного поставщика", len(recommended_risk_items)])
+        ws_conclusion.append(["Вес рисков рекомендованного поставщика", recommended_risk_score])
     ws_conclusion.append(["Потенциальная экономия", total_saving])
     ws_conclusion.append(["Выявлено рисков закупки", len(risks)])
 
